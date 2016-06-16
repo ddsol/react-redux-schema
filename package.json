@@ -1,0 +1,35 @@
+{
+  "name": "react-redux-schema",
+  "version": "0.0.1",
+  "description": "Connect Redux Schema to React with ease",
+  "main": "lib/index.js",
+  "directories": {
+    "test": "test"
+  },
+  "files": [
+    "dist",
+    "lib",
+    "es",
+    "src"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ddsol/react-redux-schema.git"
+  },
+  "keywords": [
+    "react",
+    "redux",
+    "schema",
+    "react-redux-schema",
+    "connect",
+    "state"
+  ],
+  "author": "Han de Boer",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/ddsol/react-redux-schema/issues"
+  }
+}
