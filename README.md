@@ -1,171 +1,52 @@
-#React-Redux-Schema
+# React Redux Schema
 
-###Introduction
+Official bindings for [Redux-Schema](https://github.com/ddsol/redux-schema).
 
-Like vanilla Redux has React-Redux, so will [Redux-Schema](https://github.com/ddsol/redux-schema) have this package to connect with react. Even though it's entirely possible to use React-Redux to `connect()` your components to the store, this is not the easiest way to do it. Well, at least it won't be when this package gets off the ground.
+## Installation
 
-For now there's not much here :).
+React Redux Schema requires **Redux Schema** and **React 0.14 or later**.
 
-The idea is something like (adapted from react-redux [todomvc example](https://github.com/reactjs/redux/blob/master/examples/todomv)):
 
-**index.js**
-```js
-
-...
-
-let todoModel = schema('todo', {
-  created: Date,
-  completed: Boolean,
-  title: String,
-  toggle() {
-    this.completed = !this.completed;
-  }
-  remove() {
-    this._meta.owner.remove(this);
-  }
-});
-
-let schema = {
-  todos: collection(todoModel),
-  
-  filter: {
-    type: String,
-    validate: /^(?:all|active|completed)$/
-  },
-  
-  clearCompleted() {
-    this.todos.all.forEach(todo => {
-      if (todo.completed) {
-        todo.remove();
-      }
-    });
-  }
-  
-  completeAll() {
-    const allAreMarked = this.todos.all.every(todo => todo.completed);
-    this.todos.forEach(todo => todo.completed = !allAreMarked);
-  }
-};
-
-let createSchemaStore = schemaStore(schema, { debug: true }, createStore); <-- shorthand for ...ebug: true })(createStore)() 
-
-let store = createSchemaStore()
-
-render(
-  <Provider store={store}>
-    <App />
-  </Provider>,
-  document.getElementById('root')
-)
+```
+npm install --save react-redux-schema
 ```
 
-And then:
+This library does _not_ come with a store provider, but you can use
+the [provider](https://github.com/reactjs/react-redux/blob/master/docs/api.md#provider-store)
+from [React Redux](https://github.com/reactjs/react-redux).
 
-**App.js**
+## API
+
+### `connect([options])`
+
+Connects a React component to a Redux Schema store.
+
+It does not modify the component class passed to it.
+Instead, it returns a new, connected component class for you to use.
+
+#### Arguments
+
+* [`options`] *(Object)* If specified, customizes the behavior of the connector.
+  * [`pure = true`] *(Boolean)*: If true, implements `shouldComponentUpdate` and determines what data is used by the component, and compares it to any new state, preventing unnecessary updates, assuming that the component is a “pure” component and does not rely on any input or state other than its props and the selected Redux Schema store’s state. *Defaults to `true`.*caveat elit
+  * [`withRef = false`] *(Boolean)*: If true, stores a ref to the wrapped component instance and makes it available via `getWrappedInstance()` method. *Defaults to `false`.*
+
+#### Example
+
 ```js
+import connect from 'react-redux-schema'
 
-... (imports and such)
-
-let { Todo } = store.schema.todos.model; <-- effectively binds a constructor for Todo to the path in the the store
-
-class App extends Component {
-  render() {
-    const { todos, filter } = this.props.store
-    return (
-      <div>
-        <Header addTodo={title => new Todo({ // <-- Ultra easy
-          created: Date.now(),
-          completed: false,
-          title
-        })} />
-        <MainSection store = { store } /> //<-- By passing a parent object (here, the store), it's possible to have write access by setting properties. Needed for filter.
-      </div>
-    )
-  }
-}
-
-App.propTypes = {
-  store: store.toReactPropType(),
-};
-
-export default connect({
-  store: '' //<-- This just means we want all the data. Could also say todos: 'todos' or form: 'forms.emailForm'
-})(App);
-```
-
-**MainSection.js**
-```js
-...
-
-const todoFilters = {
-  all: () => true,
-  active: todo => !todo.completed,
-  completed: todo => todo.completed
-};
-
-class MainSection extends Component {
-  renderToggleAll(completedCount) {
-    const todos = this.props.store.todos
-    if (todos.length > 0) {
-      return (
-        <input className="toggle-all"
-               type="checkbox"
-               checked={completedCount === todos.length}
-               onChange={() => this.props.store.completeAll()} />
-      )
-    }
-  }
-  
-  renderFooter(completedCount) {
-    const { todos, filter } = this.props.store
-    const activeCount = todos.length - completedCount
-
-    if (todos.length) {
-      return (
-        <Footer completedCount={completedCount}
-                activeCount={activeCount}
-                filter={filter}
-                onClearCompleted={()=>this.props.store.clearCompleted()}
-                onShow={filter => this.props.store.filter = filter} />
-      )
-    }
-  }
-  
-  render() {
-    const { todos, filter } = this.props.store;
-
-    const filteredTodos = todos.filter(todoFilters[filter])
-    const completedCount = todos.reduce((count, todo) =>
-      todo.completed ? count + 1 : count,
-      0
-    );
-
-    return (
-      <section className="main">
-        <ul className="todo-list">
-          {filteredTodos.map(todo =>
-            <TodoItem key={todo.id} todo={todo} />
-          )}
-        </ul>
-        {this.renderFooter(completedCount)}
-      </section>
-    )
-  }
-}
-
-MainSection.propTypes = {
-  store: store.toReactPropType()
-}
-
-export default MainSection
+export default connect()(MyApp);
 ```
 
 
-The above is missing a pile of files, but there isn't any package yet, so it's just to get an idea of how it works.
-Of course:
-- no actions
-- no reducers
-- no dispatch
-- real methods
-- `this` for state
+## How it works
+
+Every time data accessed through the Redux Schema store, the store can record the path where this data is stored in the state. During rendering of the wrapped component, this tracing is enabled. By doing this, it becomes known what data the element depends on. Redux Schema Connect can then determine if the component needs to be rerendered.
+
+Since the parent component can pass Redux Schema instances, and since the component itself has access to the Schema Store, there is no need for selectors. Since the Redux Schema instances allow direct writes without violating immutability of the store, there is no need for any actions, dispatching, or binding.
+
+In React Redux Schema, the purpose of connect is not so much to connect the component to the data, but instead it helps to render if and only if it's needed. Even if sub-components are not Redux Schema aware, they will still leave a trace when accessing the Redux Schema instances.
+
+It is important to keep in mind that `connect` can only manage data access through Redux Schema instances. If data is accessed from anywhere else, or directly from the state, then this access is not tracked. Therefore, if the data later changes, then there is no way for `connect` to be aware of this. It will stubbornly refuse to rerender if neither props nor previously registered state have changed. Even if the internal state of a wrapped component changes, it will still not be rerendered, because (as in React Redux connect) the element is cached. The only data that is checked are the props passed and the previously accessed state. Because of this, when the option `pure: false` is passed, the connect component will always rerender when anything in the store changes. 
+
 
