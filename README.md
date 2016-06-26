@@ -11,10 +11,6 @@ React Redux Schema requires **Redux Schema** and **React 0.14 or later**.
 npm install --save react-redux-schema
 ```
 
-This library does _not_ come with a store provider, but you can use
-the [provider](https://github.com/reactjs/react-redux/blob/master/docs/api.md#provider-store)
-from [React Redux](https://github.com/reactjs/react-redux).
-
 ## API
 
 ### `connect([options])`
@@ -29,15 +25,65 @@ Instead, it returns a new, connected component class for you to use.
 * [`options`] *(Object)* If specified, customizes the behavior of the connector.
   * [`pure = true`] *(Boolean)*: If true, implements `shouldComponentUpdate` and determines what data is used by the component, and compares it to any new state, preventing unnecessary updates, assuming that the component is a “pure” component and does not rely on any input or state other than its props and the selected Redux Schema store’s state. *Defaults to `true`.*caveat elit
   * [`withRef = false`] *(Boolean)*: If true, stores a ref to the wrapped component instance and makes it available via `getWrappedInstance()` method. *Defaults to `false`.*
-
+  * [`injectTrace = false`] *(Boolean)*: If true, will replace the render method on the wrapped component by one that is wrapped in a call to `store.trace`. This has to be passed in in explicitly because it modifies the wrapped component.
 #### Example
 
 ```js
 import connect from 'react-redux-schema'
+let MyApp = ({info}) => <div>{info.value}</div>;
 
 export default connect()(MyApp);
 ```
 
+## Tracing access
+There are 3 ways for `connect` to speed up rendering by tracing state usage:
+- If your component is a pure render function, it's automatically wrapped in a trace call
+- If you pass the `injectTrace: true` option, your render function is replaced with one that is wrapped in a `trace` call.
+- You can manually call `trace`. The component will be passed a `trace` prop, which is a function that you can use to wrap the rendering so that all access to store data is registered.
+
+If `trace` is never called by one of the above methods, then the component will be rendered on every store change.
+
+### Pure function
+```js
+import connect from 'react-redux-schema'
+let MyApp = ({info}) => <div>{info.value}</div>;
+
+export default connect()(MyApp);
+```
+
+### Pass `intectTrace: true`
+
+```js
+import connect from 'react-redux-schema';
+import React from 'react';
+
+class MyApp extends React.Component {
+  render() {
+    return <div>Hello {this.props.name}</div>;
+  }
+}
+
+export default connect({ injectTrace: true })(MyApp);
+
+```
+
+### Wrap render with `trace`
+
+```js
+import connect from 'react-redux-schema';
+import React from 'react';
+
+class MyApp extends React.Component {
+  render() {
+    return this.props.trace(()=>{
+      return <div>Hello {this.props.name}</div>;
+    });
+  }
+}
+
+export default connect()(MyApp);
+
+```
 
 ## How it works
 
@@ -47,6 +93,6 @@ Since the parent component can pass Redux Schema instances, and since the compon
 
 In React Redux Schema, the purpose of connect is not so much to connect the component to the data, but instead it helps to render if and only if it's needed. Even if sub-components are not Redux Schema aware, they will still leave a trace when accessing the Redux Schema instances.
 
-It is important to keep in mind that `connect` can only manage data access through Redux Schema instances. If data is accessed from anywhere else, or directly from the state, then this access is not tracked. Therefore, if the data later changes, then there is no way for `connect` to be aware of this. It will stubbornly refuse to rerender if neither props nor previously registered state have changed. Even if the internal state of a wrapped component changes, it will still not be rerendered, because (as in React Redux connect) the element is cached. The only data that is checked are the props passed and the previously accessed state. Because of this, when the option `pure: false` is passed, the connect component will always rerender when anything in the store changes. 
+It is important to keep in mind that `connect` can only manage data access through Redux Schema instances. If data is accessed from anywhere else, or directly from the state, then this access is not tracked. Therefore, if the data later changes, then there is no way for `connect` to be aware of this. It will stubbornly refuse to rerender if neither props nor previously registered state have changed. The only data that is checked are the props passed and the previously accessed state. Because of this, when the option `pure: false` is passed, the connect component will always rerender when anything in the store changes. 
 
-
+There is no need to use a store provider. Simply passing a redux-schema instance gives `connect` enough information to get the store and setup the state monitoring.
