@@ -53,6 +53,33 @@ export default function connect(options = {}) {
   return function wrapWithConnect(WrappedComponent) {
     const connectDisplayName = `SchemaConnect(${getDisplayName(WrappedComponent)})`;
 
+    let ElementComponent = WrappedComponent;
+    if (ElementComponent.prototype && ElementComponent.prototype.isReactComponent && ElementComponent.prototype.render) {
+      if (options.injectTrace) {
+        let renderMethod = ElementComponent.prototype.render;
+        ElementComponent.prototype.render = function(props) {
+          if (props && typeof props.trace === 'function') {
+            return props.trace(() => renderMethod.apply(this, arguments));
+          } else {
+            return renderMethod.apply(this, arguments);
+          }
+        };
+      }
+    } else {
+      ElementComponent = function(props) {
+        if (props && typeof props.trace === 'function') {
+          return props.trace(() => WrappedComponent.apply(this, arguments));
+        } else {
+          return WrappedComponent.apply(this, arguments);
+        }
+      };
+    }
+    Object.defineProperty(ElementComponent, 'name', {
+      configurable: true,
+      enumerable: true,
+      value: WrappedComponent.name
+    });
+
     class Connect extends Component {
       shouldComponentUpdate() {
         return !this.recorded || this.haveOwnPropsChanged || this.hasStoreStateChanged;
@@ -62,6 +89,16 @@ export default function connect(options = {}) {
         super(props, context);
         this.version = version;
         this.store = props.store || context.store;
+
+        if (!this.store) {
+          Object.keys(props).forEach(name => {
+            if (this.store) return;
+            let prop = props[name];
+            if (prop._meta && prop._meta.store) {
+              this.store = prop._meta.store;
+            }
+          });
+        }
 
         invariant(this.store,
           `Could not find "store" in either the context or ` +
@@ -73,6 +110,20 @@ export default function connect(options = {}) {
         const storeState = this.store.getState();
         this.state = { storeState };
         this.clearCache();
+        let tracing = false;
+        this.trace = func => {
+          if (tracing) return func();
+          tracing = true;
+          let result = undefined;
+          try {
+            this.recorded = this.store.trace(() => {
+              result = func();
+            }, true);
+          } finally {
+            tracing = false;
+          }
+          return result;
+        };
       }
 
       isSubscribed() {
@@ -119,10 +170,8 @@ export default function connect(options = {}) {
 
         const storeState = this.store.getState();
 
-        if (this.recorded) {
-          if (this.store.sameRecordedState(this.recorded)) {
-            return;
-          }
+        if (this.recorded && this.store.sameRecordedState(this.recorded)) {
+          return;
         }
 
         this.hasStoreStateChanged = true;
@@ -143,7 +192,7 @@ export default function connect(options = {}) {
                 haveOwnPropsChanged,
                 hasStoreStateChanged,
                 renderedElement
-              } = this;
+                } = this;
 
         this.haveOwnPropsChanged = false;
         this.hasStoreStateChanged = false;
@@ -152,16 +201,15 @@ export default function connect(options = {}) {
           return renderedElement;
         }
 
-        this.recorded = this.store.trace(() => {
-          if (withRef) {
-            this.renderedElement = createElement(WrappedComponent, {
-              ...this.props,
-              ref: 'wrappedInstance'
-            });
-          } else {
-            this.renderedElement = createElement(WrappedComponent, this.props);
-          }
-        }, true);
+        if (withRef) {
+          this.renderedElement = createElement(ElementComponent, {
+            ...this.props,
+            trace: this.trace,
+            ref: 'wrappedInstance'
+          });
+        } else {
+          this.renderedElement = createElement(ElementComponent, { ...this.props, trace: this.trace });
+        }
 
         return this.renderedElement;
       }
