@@ -59,7 +59,7 @@ import React from 'react';
 
 class MyApp extends React.Component {
   render() {
-    return <div>Hello {this.props.name}</div>;
+    return <div>Hello {this.props.data.name}</div>;
   }
 }
 
@@ -76,7 +76,7 @@ import React from 'react';
 class MyApp extends React.Component {
   render() {
     return this.props.trace(()=>{
-      return <div>Hello {this.props.name}</div>;
+      return <div>Hello {this.props.data.name}</div>;
     });
   }
 }
@@ -96,3 +96,48 @@ In React Redux Schema, the purpose of connect is not so much to connect the comp
 It is important to keep in mind that `connect` can only manage data access through Redux Schema instances. If data is accessed from anywhere else, or directly from the state, then this access is not tracked. Therefore, if the data later changes, then there is no way for `connect` to be aware of this. It will stubbornly refuse to rerender if neither props nor previously registered state have changed. The only data that is checked are the props passed and the previously accessed state. Because of this, when the option `pure: false` is passed, the connect component will always rerender when anything in the store changes. 
 
 There is no need to use a store provider. Simply passing a redux-schema instance gives `connect` enough information to get the store and setup the state monitoring.
+
+
+## Considerations
+
+Because only property accesses can be traced, if you pass a simple value (such as a String, Number, or plain object) that may be the result of some property access to a child component, then the component that accessed the property will be rerendered.
+
+```js
+import connect from 'react-redux-schema';
+import React from 'react';
+
+let Child = ({show}) => (<span>{show}</span>); 
+
+let App = ({root}) => (
+  <div>
+    Child:
+    <Child show={root.show} />
+  </div>
+)
+App = connect()(App)
+
+```
+
+In this example, the new property value will still be passed to the child component, and therefore rerender it, but often it's not necessary to rerender the parent component itself. In this case it may be better to pass the containing Redux Shema instance object to the child component instead.
+
+```js
+import connect from 'react-redux-schema';
+import React from 'react';
+
+
+let Child = ({root}) => (<span>{root.show}</span>); 
+
+Child = connect()(Child);
+
+let App = ({root}) => (
+  <div>
+    Child:
+    <Child show={root} />
+  </div>
+)
+App = connect()(App)
+```
+
+In this example, Child will be rerendered when `root.show` changes, but `App` will not.
+
+Note that in the last example it's not neccesary to `connect()` the `App` since it doesn't use any part of the Redux Schema instance passed to it.
