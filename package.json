@@ -1,6 +1,6 @@
 {
   "name": "react-redux-schema",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Connect Redux Schema to React with ease",
   "main": "lib/index.js",
   "jsnext:main": "es/index.js",
