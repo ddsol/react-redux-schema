@@ -58,6 +58,7 @@ export default function connect(options = {}) {
       if (options.injectTrace) {
         let renderMethod = ElementComponent.prototype.render;
         ElementComponent.prototype.render = function(props) {
+          props = props || this && this.props;
           if (props && typeof props.trace === 'function') {
             return props.trace(() => renderMethod.apply(this, arguments));
           } else {
